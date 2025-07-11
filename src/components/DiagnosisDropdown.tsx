@@ -1,11 +1,7 @@
-// src/components/DiagnosisDropdown.tsx
 "use client";
 
 import React from "react";
 import AsyncSelect from "react-select/async";
-import type { StylesConfig, CSSObjectWithLabel } from "react-select";
-
-
 import type { FC } from "react";
 
 export interface ICDOption {
@@ -14,6 +10,7 @@ export interface ICDOption {
 }
 
 async function loadOptions(input: string): Promise<ICDOption[]> {
+  if (input.length < 1) return []; // ✅ no fetch until 1+ char
   const res = await fetch(`/api/icd10?search=${encodeURIComponent(input)}`);
   if (!res.ok) return [];
   return res.json();
