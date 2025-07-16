@@ -1,19 +1,13 @@
+// src/components/ICD11Dropdown.tsx
 "use client";
 
-import React from "react";
+import React, { FC, useMemo, useCallback, useState } from "react";
 import AsyncSelect from "react-select/async";
-import type { FC } from "react";
+import rawData from "@/app/data/icd11.json";
 
 export interface ICDOption {
   code: string;
   label: string;
-}
-
-async function loadOptions(input: string): Promise<ICDOption[]> {
-  if (input.length < 1) return []; // ✅ no fetch until 1+ char
-  const res = await fetch(`/api/icd10?search=${encodeURIComponent(input)}`);
-  if (!res.ok) return [];
-  return res.json();
 }
 
 interface Props {
@@ -21,17 +15,51 @@ interface Props {
   onChange: (opt: ICDOption | null) => void;
 }
 
-export const DiagnosisDropdown: FC<Props> = ({ value, onChange }) => (
-  <AsyncSelect
-    cacheOptions
-    loadOptions={loadOptions}
-    defaultOptions={false}
-    value={value}
-    onChange={onChange}
-    getOptionLabel={(o) => `${o.code} – ${o.label}`}
-    getOptionValue={(o) => o.code}
-    placeholder="Type to search ICD-10…"
-    noOptionsMessage={() => "No matching code"}
-    isClearable
-  />
-);
+export const ICD11Dropdown: FC<Props> = ({ value, onChange }) => {
+  // 1) Build your options array once
+  const allOptions: ICDOption[] = useMemo(
+    () =>
+      rawData.map((e) => ({
+        code: e.code,
+        label: e.display,
+      })),
+    []
+  );
+
+  // 2) loadOptions: prefix‑only filter on code
+  const loadOptions = useCallback(
+    (input: string) => {
+      const term = input.trim().toLowerCase();
+      if (!term) return Promise.resolve([]);
+      // Only codes starting with the term
+      const matches = allOptions.filter((o) =>
+        o.code.toLowerCase().startsWith(term)
+      );
+      return Promise.resolve(matches.slice(0, 10));
+    },
+    [allOptions]
+  );
+
+  // 3) Custom “no options” message
+  const noOptionsMessage = useCallback(
+    ({ inputValue }: { inputValue: string }) =>
+      inputValue.length > 0 ? "Wrong code" : "Start typing a code",
+    []
+  );
+
+  return (
+    <AsyncSelect
+      cacheOptions
+      defaultOptions={false}
+      loadOptions={loadOptions}
+      value={value}
+      onChange={(opt) => onChange(opt as ICDOption | null)}
+      getOptionLabel={(o) => `${o.code} – ${o.label}`}
+      getOptionValue={(o) => o.code}
+      placeholder="Type an ICD‑11 code…"
+      noOptionsMessage={noOptionsMessage}
+      isClearable
+      instanceId="icd11-client"
+    />
+  );
+};
