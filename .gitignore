@@ -39,3 +39,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Ignore the ICD‑11 raw CSV export
+/icd11_mms.csv
