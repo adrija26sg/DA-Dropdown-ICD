@@ -1,7 +1,7 @@
 // src/components/ICD11Dropdown.tsx
 "use client";
 
-import React, { FC, useMemo, useCallback, useState } from "react";
+import React, { FC, useMemo, useCallback } from "react";
 import AsyncSelect from "react-select/async";
 import rawData from "@/app/data/icd11.json";
 
