@@ -1,9 +1,8 @@
 
 ### icd10-prototype
 
-### FILES OF USED IN THIS PROJECT
-- // src/app/api/icd10/route.ts
-- // src/components/DiagnosisDropdown.tsx
+###icd11 codes in json file under data
+
 
 
 First, run the development server:
