@@ -35,23 +35,19 @@ export const DiagnosisDropdown: FC<Props> = ({ value, onChange }) => {
   const icd10Cache = useRef(new Map<string, ICDOption[]>());
 
   const fetchICD10 = async (input: string): Promise<ICDOption[]> => {
-    // First check IndexedDB
-    const persisted = await get(input);
+    const persisted = await get<ICDOption[] | undefined>(input);
     if (persisted) return persisted;
 
-    // Then check in-memory cache
     if (icd10Cache.current.has(input)) return icd10Cache.current.get(input)!;
 
-    // Finally call API
     const url = `https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search?sf=code,name&terms=${encodeURIComponent(input)}&maxList=10`;
     const res = await fetch(url);
-    const data = await res.json();
+    const data: [string, string[], [string, string][]] = await res.json();
     const results = data[2].map((entry: [string, string]) => ({
       code: entry[0],
       label: entry[1],
     }));
 
-    // Save in memory and persistent cache
     icd10Cache.current.set(input, results);
     await set(input, results);
 
@@ -60,18 +56,16 @@ export const DiagnosisDropdown: FC<Props> = ({ value, onChange }) => {
 
   const loadOptions = useMemo(
     () =>
-      debounce((input: string, callback: (options: ICDOption[]) => void) => {
+      debounce((input: string, callback: (options: ICDOption[]) => void): void => {
         const term = input.trim().toLowerCase();
         if (!term) return callback([]);
 
-        // Strict prefix match for ICD-11 code
         const localMatches = allOptions.filter((o) =>
           o.code.toLowerCase().startsWith(term)
         ).slice(0, 10);
 
-        callback(localMatches); // Step 1: Instant ICD-11 result
+        callback(localMatches);
 
-        // Step 2: Append ICD-10 matches when ready
         fetchICD10(term).then((apiMatches) => {
           const merged = [
             ...localMatches,
