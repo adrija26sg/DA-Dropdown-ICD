@@ -10,9 +10,11 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@lowlysre/icd-10-cm": "^0.0.4",
     "csv-parse": "^6.0.0",
     "exceljs": "^4.4.0",
     "fuse.js": "^7.1.0",
+    "idb-keyval": "^6.2.2",
     "next": "15.3.5",
     "node-fetch": "^3.3.2",
     "react": "^19.0.0",

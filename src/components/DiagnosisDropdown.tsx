@@ -1,11 +1,13 @@
-// src/components/DiagnosisDropdown.tsx
 "use client";
 
-import React, { FC, useMemo, useCallback } from "react";
+import React, { FC, useMemo, useCallback, useRef } from "react";
 import AsyncSelect from "react-select/async";
-import rawDataUntyped from "@/app/data/icd10_final.json";
+import { get, set } from "idb-keyval";
+import rawDataUntyped from "@/app/data/icd11.json";
+
 interface RawEntry { code: string; display: string }
 const rawData = rawDataUntyped as RawEntry[];
+
 export interface ICDOption {
   code: string;
   label: string;
@@ -16,30 +18,78 @@ interface Props {
   onChange: (opt: ICDOption | null) => void;
 }
 
+function debounce<T extends (...args: any[]) => void>(func: T, delay: number) {
+  let timer: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => func(...args), delay);
+  };
+}
+
 export const DiagnosisDropdown: FC<Props> = ({ value, onChange }) => {
-  // 1) One‑time map your JSON into { code, label }
   const allOptions: ICDOption[] = useMemo(
     () => rawData.map((e) => ({ code: e.code, label: e.display })),
     []
   );
 
-  // 2) Prefix‑only filter on code
-  const loadOptions = useCallback(
-    (input: string) => {
-      const term = input.trim().toLowerCase();
-      if (!term) return Promise.resolve([]);
-      const matches = allOptions.filter((o) =>
-        o.code.toLowerCase().startsWith(term)
-      );
-      return Promise.resolve(matches.slice(0, 10));
-    },
+  const icd10Cache = useRef(new Map<string, ICDOption[]>());
+
+  const fetchICD10 = async (input: string): Promise<ICDOption[]> => {
+    // First check IndexedDB
+    const persisted = await get(input);
+    if (persisted) return persisted;
+
+    // Then check in-memory cache
+    if (icd10Cache.current.has(input)) return icd10Cache.current.get(input)!;
+
+    // Finally call API
+    const url = `https://clinicaltables.nlm.nih.gov/api/icd10cm/v3/search?sf=code,name&terms=${encodeURIComponent(input)}&maxList=10`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const results = data[2].map((entry: [string, string]) => ({
+      code: entry[0],
+      label: entry[1],
+    }));
+
+    // Save in memory and persistent cache
+    icd10Cache.current.set(input, results);
+    await set(input, results);
+
+    return results;
+  };
+
+  const loadOptions = useMemo(
+    () =>
+      debounce((input: string, callback: (options: ICDOption[]) => void) => {
+        const term = input.trim().toLowerCase();
+        if (!term) return callback([]);
+
+        // Strict prefix match for ICD-11 code
+        const localMatches = allOptions.filter((o) =>
+          o.code.toLowerCase().startsWith(term)
+        ).slice(0, 10);
+
+        callback(localMatches); // Step 1: Instant ICD-11 result
+
+        // Step 2: Append ICD-10 matches when ready
+        fetchICD10(term).then((apiMatches) => {
+          const merged = [
+            ...localMatches,
+            ...apiMatches.filter(
+              (api) => !localMatches.find((local) => local.code === api.code)
+            )
+          ];
+          callback(merged.slice(0, 15));
+        }).catch(() => {
+          // fail silently
+        });
+      }, 300),
     [allOptions]
   );
 
-  // 3) Custom “no options” messaging
   const noOptionsMessage = useCallback(
     ({ inputValue }: { inputValue: string }) =>
-      inputValue.length > 0 ? "Wrong code" : "Start typing a code",
+      inputValue.length > 0 ? "No match found" : "Start typing...",
     []
   );
 
@@ -52,10 +102,10 @@ export const DiagnosisDropdown: FC<Props> = ({ value, onChange }) => {
       onChange={(opt) => onChange(opt as ICDOption | null)}
       getOptionLabel={(o) => `${o.code} – ${o.label}`}
       getOptionValue={(o) => o.code}
-      placeholder="Type an ICD‑10 code…"
+      placeholder="Search ICD-10 + ICD-11 codes..."
       noOptionsMessage={noOptionsMessage}
       isClearable
-      instanceId="icd10-client"
+      instanceId="diagnosis-unified"
     />
   );
 };
