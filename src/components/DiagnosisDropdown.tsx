@@ -18,13 +18,14 @@ interface Props {
   onChange: (opt: ICDOption | null) => void;
 }
 
-function debounce<T extends (...args: any[]) => void>(func: T, delay: number) {
+function debounce<T extends (...args: any[]) => void>(func: T, delay: number): (...args: Parameters<T>) => void {
   let timer: NodeJS.Timeout;
   return (...args: Parameters<T>) => {
     clearTimeout(timer);
     timer = setTimeout(() => func(...args), delay);
   };
 }
+
 
 export const DiagnosisDropdown: FC<Props> = ({ value, onChange }) => {
   const allOptions: ICDOption[] = useMemo(
